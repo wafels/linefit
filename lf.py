@@ -2,83 +2,78 @@
 # line fitting program
 #
 import numpy as np
+from scipy.integrate import quad
 import pymc
 
-def line_profile(x, a):
-    f = a[0]
-    return f
 
-def integral_of_gaussian_plus_constant(lambda_bins, parameters):
 
+def integrand(x, c, a, p, w):
+    onent = (x-p) / w
+    normalize = 1.0 / (np.sqrt(2*np.pi) * w)
+    return c + a * normalize * np.exp(-0.5*onent**2)
+
+
+def integrate_across_one_bin(lhs, rhs, args):
+    answer = quad(integrand, lhs, rhs, args=args)
+    return answer[0]
+
+
+def integral_across_all_bins(bins, args):
+    integral = []
+    for bin_edges in bins:
+        integral.append(integrate_across_one_bin(bin_edges[0], bin_edges[1], args))
+    return np.asarray(integral)
 
 
 # -----------------------------------------------------------------------------
 # Gaussian plus a constant
 #
-def Log_splwc(bins, observed_counts_per_bin, init=None):
-    """Power law with a constant.  This model assumes that the power
-    spectrum is made up of a power law and a constant background.  At high
-    frequencies the power spectrum is dominated by the constant background.
+def gaussian_plus_constant(bins, observed_counts_per_bin, init=None):
+    """Assumes the line can be modeled using a constant and a Gaussian
     """
     if init is None:
         constant = pymc.Uniform('constant',
                                 lower=0.0,
                                 upper=6.0,
-                                doc='power law index')
+                                doc='constant')
 
-        amplitude = pymc.Uniform('power_law_norm',
-                                lower=0.0,
-                                upper=10.0,
-                                doc='power law normalization')
+        amplitude = pymc.Uniform('amplitude',
+                                 lower=0.0,
+                                 upper=10.0,
+                                 doc='amplitude')
 
         position = pymc.Uniform('position',
                                 lower=-20.0,
                                 upper=10.0,
-                                doc='background')
+                                doc='position')
 
         width = pymc.Uniform('width',
                              lower=-20.0,
                              upper=10.0,
-                             doc='background')
+                             doc='width')
     else:
-        constant = pymc.Uniform('constant',
-                                lower=0.0,
-                                upper=6.0,
-                                doc='power law index')
-
-        amplitude = pymc.Uniform('power_law_norm',
-                                lower=0.0,
-                                upper=10.0,
-                                doc='power law normalization')
-
-        position = pymc.Uniform('position',
-                                lower=-20.0,
-                                upper=10.0,
-                                doc='background')
-
-        width = pymc.Uniform('width',
-                             lower=-20.0,
-                             upper=10.0,
-                             doc='background')
+        raise ValueError('Not implemented yet')
 
     # Total counts
     total_counts = np.sum(observed_counts_per_bin)
 
-    # Model for the power law spectrum
+    # Model for the emission line
     @pymc.deterministic(plot=False)
     def modeled_emission(c=constant,
                          a=amplitude,
                          p=position,
                          w=width,
                          bins=bins):
-        # A pure and simple power law model#
-        out = integral_of_gaussian_plus_constant(bins, [c, a, p, w])
+        # A pure and simple power law model
+        out = integral_across_all_bins(bins, (c, a, p, w))
         return out
 
-    spectrum = pymc.Poisson('spectrum',
+    spectrum = pymc.Poisson('emission',
                             mu=modeled_emission,
                             value=observed_counts_per_bin,
                             observed=True)
+
+    # Need to add in the potential constraint
 
     predictive = pymc.Poisson('predictive',
                               mu=modeled_emission)
