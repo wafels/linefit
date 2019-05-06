@@ -3,7 +3,18 @@
 #
 import numpy as np
 from scipy.integrate import quad
+from scipy.special import gammaln
 import pymc
+
+
+def ln_poisson(lam, k):
+    """
+    Log of the Poisson distribution
+    :param lam:
+    :param k:
+    :return: log of the Poisson distribution
+    """
+    return k*np.log(lam) - lam - gammaln(k+1)
 
 
 
