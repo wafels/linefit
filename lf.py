@@ -54,9 +54,6 @@ def gaussian_plus_constant(bins, observed_counts_per_bin, init=None):
     else:
         raise ValueError('Not implemented yet')
 
-    # Total counts
-    total_counts = np.sum(observed_counts_per_bin)
-
     # Model for the emission line
     @pymc.deterministic(plot=False)
     def modeled_emission(c=constant,
@@ -67,6 +64,17 @@ def gaussian_plus_constant(bins, observed_counts_per_bin, init=None):
         # A pure and simple power law model
         out = integral_across_all_bins(bins, (c, a, p, w))
         return out
+
+    #
+    @pymc.potential
+    def constrain_total_emission():
+        total_observed_emission = np.sum(observed_counts_per_bin)
+        total_fit_emission = np.sum(modeled_emission(c=constant,
+                         a=amplitude,
+                         p=position,
+                         w=width,
+                         bins=bins))
+        return
 
     spectrum = pymc.Poisson('emission',
                             mu=modeled_emission,
