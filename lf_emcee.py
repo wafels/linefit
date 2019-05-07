@@ -6,9 +6,9 @@
 import numpy as np
 from numpy.random import poisson
 from scipy.integrate import quad
+from scipy.special import gammaln
 import matplotlib.pyplot as plt
 import emcee
-
 
 
 def emission_model_at_sun(x, a, p, w):
@@ -90,12 +90,33 @@ def equally_spaced_bins(inner_value=1, outer_value=2, nbins=100):
 # Log of the uniform prior
 def ln_uniform(theta, lower, upper):
     if lower < theta < upper:
-        return 0.0
+        return 0.0  # should be ln(uniform value)
     return -np.inf
 
-# Log of the Poisson
-def ln_poisson(mean):
+
+def ln_poisson(lam, k):
+    """
+    Log of the Poisson distribution
+    :param lam:
+    :param k:
+    :return: log of the Poisson distribution
+    """
+    return k*np.log(lam) - lam - gammaln(k+1)
+
     
+def ln_posterior(bin_edges, args):
+    a, p, w = args
+    ln_amplitude_prior = ln_uniform(a, 0, 10000)
+    ln_position_prior = ln_uniform(p, -100, 100)
+    ln_width_prior = ln_uniform(w, 1, 20)
+
+    # Constrain the total model emission to be Poisson-distributed with a mean
+    # value equal to the sum of the total observed emission
+    ln_constraint_prior = ln_poisson(total_observed_emission, total_model_emission)
+
+    ln_likelihood = ln_data_given_model(observed_emission, args)
+
+    return ln_likelihood + ln_amplitude_prior + ln_position_prior + ln_width_prior + ln_constraint_prior
 
 #
 # Create some fake data
